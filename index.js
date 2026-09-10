@@ -99,6 +99,24 @@ app.get("/", (_req, res) => {
 
 app.get("/status", (_req, res) => res.json({ status: connectionStatus }));
 
+// يسرد كل القروبات اللي الرقم المرتبط عضو فيها — مطلوب لأن /send للقروب يحتاج JID (شكله xxxx@g.us)
+// مو اسم القروب، وما فيه طريقة ثانية تجيبه غير من هنا
+app.get("/groups", async (req, res) => {
+  if (API_KEY && req.headers["x-api-key"] !== API_KEY) {
+    return res.status(401).json({ success: false, error: "unauthorized" });
+  }
+  if (connectionStatus !== "connected") {
+    return res.status(503).json({ success: false, error: "not_connected" });
+  }
+  try {
+    const groups = await sock.groupFetchAllParticipating();
+    const list = Object.values(groups).map((g) => ({ id: g.id, name: g.subject }));
+    res.json({ success: true, groups: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: String(err.message || err) });
+  }
+});
+
 // إرسال رسالة نصية — محمي بمفتاح مشترك (x-api-key) حتى ما يقدر أي حد يستخدم الرقم المرتبط للإرسال
 app.post("/send", async (req, res) => {
   if (API_KEY && req.headers["x-api-key"] !== API_KEY) {
