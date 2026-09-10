@@ -150,10 +150,11 @@ app.post("/send", async (req, res) => {
   const jid = normalizeToJid(to);
   if (!jid || !message) return res.status(400).json({ success: false, error: "invalid_input" });
   try {
-    await sock.sendMessage(jid, { text: message });
-    res.json({ success: true });
+    const result = await sock.sendMessage(jid, { text: message });
+    console.log("send result for", jid, ":", JSON.stringify(result));
+    res.json({ success: true, messageId: result?.key?.id || null, remoteJid: result?.key?.remoteJid || null });
   } catch (err) {
-    console.error("send error:", err);
+    console.error("send error for", jid, ":", err);
     res.status(500).json({ success: false, error: String(err.message || err) });
   }
 });
