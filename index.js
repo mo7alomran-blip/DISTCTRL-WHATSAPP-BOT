@@ -102,6 +102,24 @@ app.get("/", (_req, res) => {
 
 app.get("/status", (_req, res) => res.json({ status: connectionStatus }));
 
+// يتحقق هل رقم مسجّل فعليًا بواتساب — مفيد لتشخيص "الرسالة ما توصل" (رقم غلط/مو مسجّل أصلاً، مو مشكلة نظام)
+app.get("/check", async (req, res) => {
+  if (API_KEY && req.headers["x-api-key"] !== API_KEY) {
+    return res.status(401).json({ success: false, error: "unauthorized" });
+  }
+  if (connectionStatus !== "connected") {
+    return res.status(503).json({ success: false, error: "not_connected" });
+  }
+  const jid = normalizeToJid(req.query.phone);
+  if (!jid) return res.status(400).json({ success: false, error: "invalid_input" });
+  try {
+    const result = await sock.onWhatsApp(jid);
+    res.json({ success: true, exists: !!(result?.[0]?.exists), jid: result?.[0]?.jid || null });
+  } catch (err) {
+    res.status(500).json({ success: false, error: String(err.message || err) });
+  }
+});
+
 // يسرد كل القروبات اللي الرقم المرتبط عضو فيها — مطلوب لأن /send للقروب يحتاج JID (شكله xxxx@g.us)
 // مو اسم القروب، وما فيه طريقة ثانية تجيبه غير من هنا
 app.get("/groups", async (req, res) => {
