@@ -6,6 +6,7 @@
 import express from "express";
 import qrcode from "qrcode";
 import pino from "pino";
+import fs from "fs";
 import {
   makeWASocket,
   useMultiFileAuthState,
@@ -64,12 +65,14 @@ async function startSock() {
       connectionStatus = "disconnected";
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const loggedOut = statusCode === DisconnectReason.loggedOut;
-      console.log("انقطع الاتصال:", statusCode, loggedOut ? "(تسجيل خروج — يحتاج QR جديد)" : "(محاولة إعادة اتصال تلقائية)");
-      if (!loggedOut) {
-        startSock().catch((e) => console.error("فشل إعادة الاتصال:", e));
-      } else {
-        latestQr = null;
+      console.log("انقطع الاتصال:", statusCode, loggedOut ? "(تسجيل خروج — نمسح الجلسة القديمة ونبدأ من جديد لـQR جديد)" : "(محاولة إعادة اتصال تلقائية)");
+      latestQr = null;
+      if (loggedOut) {
+        // جلسة تسجيل الخروج القديمة صارت غير صالحة — لازم نمسحها قبل إعادة المحاولة، وإلا Baileys يحاول
+        // يستخدمها من جديد ويفشل بصمت (البوت كان يعلق هنا للأبد قبل هذا الإصلاح، بدون أي محاولة تعافي تلقائية)
+        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
       }
+      startSock().catch((e) => console.error("فشل إعادة الاتصال:", e));
     }
   });
 }
