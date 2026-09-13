@@ -159,4 +159,33 @@ app.post("/send", async (req, res) => {
   }
 });
 
+// إرسال مرفق (PDF غالبًا) عبر رابط عام مباشر — Baileys يقدر يجيب المحتوى بنفسه من mediaUrl بدون ما نمرّر
+// البايتات له. مطلوب خصوصًا لمرفقات القروبات: DistCtrl (whatsapp.js/sendWhatsAppMediaUrl) يوصل PDF
+// للأفراد فقط عبر بوابة Hermosa؛ رقم Hermosa مو عضو بقروبات العمل الفعلية، فأي مرفق "لقروب" كان
+// يفشل بصمت قبل هذا الراوت (نفس فكرة /send النصي — القروبات لازم تمر من هنا، رقم Hermosa ما يقدر يوصلها).
+app.post("/send-media", async (req, res) => {
+  if (API_KEY && req.headers["x-api-key"] !== API_KEY) {
+    return res.status(401).json({ success: false, error: "unauthorized" });
+  }
+  if (connectionStatus !== "connected") {
+    return res.status(503).json({ success: false, error: "not_connected" });
+  }
+  const { to, mediaUrl, caption, filename, mimetype } = req.body || {};
+  const jid = normalizeToJid(to);
+  if (!jid || !mediaUrl) return res.status(400).json({ success: false, error: "invalid_input" });
+  try {
+    const result = await sock.sendMessage(jid, {
+      document: { url: mediaUrl },
+      mimetype: mimetype || "application/pdf",
+      fileName: filename || "file.pdf",
+      caption: caption || undefined,
+    });
+    console.log("send-media result for", jid, ":", JSON.stringify(result));
+    res.json({ success: true, messageId: result?.key?.id || null, remoteJid: result?.key?.remoteJid || null });
+  } catch (err) {
+    console.error("send-media error for", jid, ":", err);
+    res.status(500).json({ success: false, error: String(err.message || err) });
+  }
+});
+
 app.listen(PORT, () => console.log(`DistCtrl WhatsApp bot listening on :${PORT}`));
