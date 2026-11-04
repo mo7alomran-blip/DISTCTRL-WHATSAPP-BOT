@@ -224,11 +224,13 @@ app.post("/send", async (req, res) => {
   if (connectionStatus !== "connected") {
     return res.status(503).json({ success: false, error: "not_connected" });
   }
-  const { to, message } = req.body || {};
+  const { to, message, mentions } = req.body || {};
   const jid = normalizeToJid(to);
   if (!jid || !message) return res.status(400).json({ success: false, error: "invalid_input" });
+  // منشن فعلي (2026-11-04 «طلب تحديث العمل»): قائمة JID أفراد بصيغة 9665xxxxxxxx@s.whatsapp.net، والنص يحوي ‎@9665xxxxxxxx
+  const mentionJids = Array.isArray(mentions) ? mentions.filter((m) => /^\d{8,15}@s\.whatsapp\.net$/.test(String(m))).slice(0, 20) : [];
   try {
-    const result = await sock.sendMessage(jid, { text: message });
+    const result = await sock.sendMessage(jid, mentionJids.length ? { text: message, mentions: mentionJids } : { text: message });
     console.log("send result for", jid, ":", JSON.stringify(result));
     res.json({ success: true, messageId: result?.key?.id || null, remoteJid: result?.key?.remoteJid || null });
   } catch (err) {
